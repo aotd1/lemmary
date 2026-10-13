@@ -1,10 +1,14 @@
 package appapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -129,9 +133,9 @@ func TestMCPUpdateDocumentChangesOnlyOwnDocuments(t *testing.T) {
 	}
 
 	for name, args := range map[string]map[string]any{
-		"shared document":   {"id": foreign.Id, "title": "mine now"},
+		"shared document":    {"id": foreign.Id, "title": "mine now"},
 		"another user's tag": {"id": document.Id, "tags": []string{"other-tag"}},
-		"bad date":          {"id": document.Id, "document_date": "03.02.2024"},
+		"bad date":           {"id": document.Id, "document_date": "03.02.2024"},
 	} {
 		if res := callMCP(t, session, "update_document", args, nil); !res.IsError {
 			t.Fatalf("%s: expected IsError", name)
@@ -264,5 +268,81 @@ func TestMCPTagToolsCreateRenameAndDelete(t *testing.T) {
 	}
 	if stored, _ := app.FindRecordById("documents", document.Id); len(stored.GetStringSlice("tags")) != 0 {
 		t.Fatalf("document still tagged: %v", stored.GetStringSlice("tags"))
+	}
+}
+
+func TestMCPHTTPUploadBodyLimit(t *testing.T) {
+	app := bootQueueApp(t)
+	owner := makeQueueUser(t, app, "owner@example.com")
+	user, err := app.FindRecordById("users", owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings, err := config.FindSettingsRecord(app, config.AIEnv{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.Set("mcp_capabilities", []string{config.MCPUpload})
+	if err := app.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	rt := config.NewRuntime(config.AIEnv{})
+	if err := rt.Reload(app); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name    string
+		encoded string
+		status  int
+	}{
+		{"upload above SDK default", base64.StdEncoding.EncodeToString(bytes.Repeat([]byte("a"), 4<<20)), http.StatusOK},
+		{"upload at decoded file limit", base64.StdEncoding.EncodeToString(bytes.Repeat([]byte("b"), mcpMaxUploadBytes)), http.StatusOK},
+		{"body above route limit", strings.Repeat("a", mcpMaxBodyBytes), http.StatusRequestEntityTooLarge},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body, err := json.Marshal(map[string]any{
+				"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+				"params": map[string]any{"name": "upload_document", "arguments": map[string]any{
+					"filename": "large.txt", "content_base64": tc.encoded,
+				}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			recorder := httptest.NewRecorder()
+			event := &core.RequestEvent{App: app, Auth: user}
+			event.Request = httptest.NewRequest(http.MethodPost, "/api/mcp", bytes.NewReader(body))
+			event.Request.Header.Set("Content-Type", "application/json")
+			event.Request.Header.Set("Accept", "application/json, text/event-stream")
+			event.Request.Header.Set("MCP-Protocol-Version", "2025-03-26")
+			event.Response = recorder
+			if err := handleMCP(app, rt, nil)(event); err != nil {
+				t.Fatal(err)
+			}
+			if recorder.Code != tc.status {
+				t.Fatalf("status = %d, want %d: %s", recorder.Code, tc.status, recorder.Body.String())
+			}
+			if tc.status != http.StatusOK {
+				return
+			}
+			var response struct {
+				Error  json.RawMessage `json:"error"`
+				Result struct {
+					IsError  bool        `json:"isError"`
+					Document mcpDocument `json:"structuredContent"`
+				} `json:"result"`
+			}
+			if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+				t.Fatal(err)
+			}
+			if len(response.Error) != 0 || response.Result.IsError || response.Result.Document.ID == "" {
+				t.Fatalf("upload did not succeed: %s", recorder.Body.String())
+			}
+			stored, err := app.FindRecordById("documents", response.Result.Document.ID)
+			if err != nil || stored.GetString("user") != owner || stored.GetString("file") == "" {
+				t.Fatalf("uploaded document not stored for owner: %v", err)
+			}
+		})
 	}
 }

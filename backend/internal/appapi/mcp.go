@@ -127,8 +127,9 @@ func handleMCP(app core.App, rt *config.Runtime, idx *fulltext.Index) func(*core
 		addMCPWriteTools(server, app, userID, rt.Snapshot().Cfg.MCPCapabilities)
 		handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server },
 			&mcp.StreamableHTTPOptions{
-				Stateless:    true,
-				JSONResponse: true,
+				Stateless:           true,
+				JSONResponse:        true,
+				MaxRequestBodyBytes: mcpMaxBodyBytes,
 				// The app usually sits behind a reverse proxy on a loopback
 				// listener with a public Host header, which the SDK's default
 				// check would refuse; the route is bearer-protected already.
