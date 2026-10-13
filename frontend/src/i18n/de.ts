@@ -1157,7 +1157,7 @@ export const de: Catalog = {
   'settingsMcp.reprocessHint':
     'Führt OCR und Extraktion erneut aus. Verursacht KI-Kosten und überschreibt Metadaten, auch manuelle Änderungen.',
   'settingsMcp.upload': 'Dokumente hochladen',
-  'settingsMcp.uploadHint': 'Fügt Dateien bis 20 MB hinzu. Jede wird verarbeitet, was KI-Kosten verursacht.',
+  'settingsMcp.uploadHint': 'Fügt Dateien bis 32 MB hinzu. Jede wird verarbeitet, was KI-Kosten verursacht.',
   'settingsMcp.delete': 'Dokumente löschen',
   'settingsMcp.deleteHint': 'Endgültig: Es gibt keinen Papierkorb und kein Rückgängig.',
   'settingsMcp.tags': 'Tags verwalten',

@@ -1,10 +1,13 @@
 package appapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -181,6 +184,38 @@ func TestMCPUploadStoresAPendingDocument(t *testing.T) {
 	}
 	if _, err := decodeMCPFile(base64.StdEncoding.EncodeToString(make([]byte, mcpMaxUploadBytes+1))); err == nil {
 		t.Fatal("a file over the cap was accepted")
+	}
+}
+
+func TestMCPUploadAtTheCapFitsTheHTTPBody(t *testing.T) {
+	app := bootQueueApp(t)
+	owner := makeQueueUser(t, app, "owner@example.com")
+	server := newMCPServer(agentTools{}, newMCPDocs(app, owner))
+	addMCPWriteTools(server, app, owner, []string{config.MCPUpload})
+	srv := httptest.NewServer(mcpHTTPHandler(server))
+	t.Cleanup(srv.Close)
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "0"}, nil)
+	session, err := client.Connect(context.Background(),
+		&mcp.StreamableClientTransport{Endpoint: srv.URL, DisableStandaloneSSE: true}, nil)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+
+	// Wrapped at 76 columns like the base64 CLI: each break is escaped in the
+	// JSON, which is the largest body a file at the cap arrives in.
+	flat := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte("a"), mcpMaxUploadBytes))
+	var wrapped strings.Builder
+	for len(flat) > 76 {
+		wrapped.WriteString(flat[:76] + "\n")
+		flat = flat[76:]
+	}
+	wrapped.WriteString(flat)
+	encoded := wrapped.String()
+	res := callMCP(t, session, "upload_document", map[string]any{"filename": "big.txt", "content_base64": encoded}, nil)
+	if res.IsError {
+		t.Fatalf("upload at the cap: %#v", res.Content)
 	}
 }
 

@@ -1094,7 +1094,7 @@ export const en = {
   'settingsMcp.reprocessHint':
     'Runs OCR and extraction again. Costs AI usage and overwrites metadata, hand edits included.',
   'settingsMcp.upload': 'Upload documents',
-  'settingsMcp.uploadHint': 'Adds files up to 20 MB. Each is processed, which costs AI usage.',
+  'settingsMcp.uploadHint': 'Adds files up to 32 MB. Each is processed, which costs AI usage.',
   'settingsMcp.delete': 'Delete documents',
   'settingsMcp.deleteHint': 'Permanent: there is no trash and no undo.',
   'settingsMcp.tags': 'Manage tags',

@@ -44,7 +44,7 @@ type mcpReprocessArgs struct {
 
 type mcpUploadArgs struct {
 	Filename      string `json:"filename" jsonschema:"File name with its extension. PDF, JPEG, PNG, WebP or plain text."`
-	ContentBase64 string `json:"content_base64" jsonschema:"The file, base64-encoded (wrapped, unpadded or a data: URL are fine); at most 20 MB decoded."`
+	ContentBase64 string `json:"content_base64" jsonschema:"The file, base64-encoded (wrapped, unpadded or a data: URL are fine); at most 32 MB decoded."`
 }
 
 type mcpDeleteResult struct {

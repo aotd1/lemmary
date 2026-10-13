@@ -1273,7 +1273,7 @@ export const ru: Catalog = {
   'settingsMcp.reprocessHint':
     'Заново запускает OCR и извлечение. Расходует ИИ и перезаписывает метаданные, включая ручные правки.',
   'settingsMcp.upload': 'Загружать документы',
-  'settingsMcp.uploadHint': 'Добавляет файлы до 20 МБ. Каждый обрабатывается, что расходует ИИ.',
+  'settingsMcp.uploadHint': 'Добавляет файлы до 32 МБ. Каждый обрабатывается, что расходует ИИ.',
   'settingsMcp.delete': 'Удалять документы',
   'settingsMcp.deleteHint': 'Безвозвратно: корзины и отмены нет.',
   'settingsMcp.tags': 'Управлять тегами',

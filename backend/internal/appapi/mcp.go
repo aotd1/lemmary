@@ -26,10 +26,11 @@ const EnvMCPEnabled = "MCP_ENABLED"
 
 const (
 	// mcpMaxUploadBytes is upload_document's largest file, below the upload
-	// page's: the whole file travels base64-encoded inside one JSON body,
-	// which mcpMaxBodyBytes has to fit.
-	mcpMaxUploadBytes = 20 << 20
-	mcpMaxBodyBytes   = 28 << 20
+	// page's: the whole file travels base64-encoded, a third bigger, inside
+	// one JSON body, which mcpMaxBodyBytes has to fit with room for line
+	// breaks and the envelope.
+	mcpMaxUploadBytes = 32 << 20
+	mcpMaxBodyBytes   = 47 << 20
 	// mcpTokenTTL is how long a token minted for an agent lasts. Ten years,
 	// like the paperless one: an agent config is written once and never
 	// refreshes. Changing the password invalidates it, as with any token.
@@ -125,18 +126,24 @@ func handleMCP(app core.App, rt *config.Runtime, idx *fulltext.Index) func(*core
 		}
 		server := newMCPServer(tools, newMCPDocs(app, userID))
 		addMCPWriteTools(server, app, userID, rt.Snapshot().Cfg.MCPCapabilities)
-		handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server },
-			&mcp.StreamableHTTPOptions{
-				Stateless:    true,
-				JSONResponse: true,
-				// The app usually sits behind a reverse proxy on a loopback
-				// listener with a public Host header, which the SDK's default
-				// check would refuse; the route is bearer-protected already.
-				DisableLocalhostProtection: true,
-			})
-		handler.ServeHTTP(e.Response, e.Request)
+		mcpHTTPHandler(server).ServeHTTP(e.Response, e.Request)
 		return nil
 	}
+}
+
+func mcpHTTPHandler(server *mcp.Server) http.Handler {
+	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server },
+		&mcp.StreamableHTTPOptions{
+			Stateless:    true,
+			JSONResponse: true,
+			// The app usually sits behind a reverse proxy on a loopback
+			// listener with a public Host header, which the SDK's default
+			// check would refuse; the route is bearer-protected already.
+			DisableLocalhostProtection: true,
+			// The SDK's own default is 4 MiB, which would refuse an
+			// upload_document body long before the route's BodyLimit.
+			MaxRequestBodyBytes: mcpMaxBodyBytes,
+		})
 }
 
 type mcpSearchArgs struct {

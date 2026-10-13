@@ -77,7 +77,7 @@ Zwei Arten: Suche über den Index und einfacher Zugriff auf die Datensätze. Die
 | --- | --- | --- |
 | Metadaten bearbeiten | `update_document` | Setzt Titel, Zusammenfassung, Datum, Dokumenttyp, Korrespondent (beide bei Bedarf per Name angelegt) und Tags (vorhandene Namen, die ganze Liste) eines Dokuments und schließt die Prüfung ab. Die Änderung gilt als von Hand gemacht. |
 | Dokumente erneut verarbeiten | `reprocess_documents` | Stellt bis zu 50 Dokumente erneut in die Warteschlange für OCR und Extraktion (`auto`, `full` oder `extraction`). Verursacht KI-Kosten, und die Extraktion überschreibt die Metadaten, auch manuelle Änderungen. |
-| Dokumente hochladen | `upload_document` | Fügt eine Datei hinzu, base64-kodiert, bis 20 MB; es gelten dieselben Typen, Kontingente und dieselbe Duplikatprüfung wie auf der Upload-Seite, und die Datei wird wie jede andere verarbeitet. |
+| Dokumente hochladen | `upload_document` | Fügt eine Datei hinzu, base64-kodiert, bis 32 MB; es gelten dieselben Typen, Kontingente und dieselbe Duplikatprüfung wie auf der Upload-Seite, und die Datei wird wie jede andere verarbeitet. |
 | Dokumente löschen | `delete_documents` | Löscht bis zu 50 Dokumente samt Dateien. Endgültig: Es gibt keinen Papierkorb. |
 | Tags verwalten | `create_tag`, `rename_tag`, `delete_tag` | Legt Tags per Name an, benennt sie um und löscht sie. Ein gelöschter Tag verschwindet von seinen Dokumenten, die Dokumente bleiben. |
 
