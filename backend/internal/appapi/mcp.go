@@ -49,6 +49,7 @@ const (
 // token, superuser or not, is scoped to one users account.
 func RegisterMCP(app core.App, rt *config.Runtime, idx *fulltext.Index) {
 	enabled := mcpEnabledFromEnv(app.Logger())
+	files := mcpFileLinksFromEnv(app.Logger())
 	app.OnServe().Bind(&hook.Handler[*core.ServeEvent]{
 		Priority: 45,
 		Func: func(e *core.ServeEvent) error {
@@ -60,7 +61,10 @@ func RegisterMCP(app core.App, rt *config.Runtime, idx *fulltext.Index) {
 			if !enabled {
 				return e.Next()
 			}
-			e.Router.POST("/api/mcp", bindAuth(handleMCP(app, rt, idx))).
+			if files.enabled {
+				e.Router.GET(mcpFileRoute, handleMCPFile(app))
+			}
+			e.Router.POST("/api/mcp", bindAuth(handleMCP(app, rt, idx, files))).
 				Bind(apis.BodyLimit(mcpMaxBodyBytes))
 			e.Router.POST("/api/app/mcp/token", bindAuth(handleMCPToken(app)))
 			return e.Next()
@@ -109,7 +113,7 @@ func handleMCPToken(app core.App) func(*core.RequestEvent) error {
 	}
 }
 
-func handleMCP(app core.App, rt *config.Runtime, idx *fulltext.Index) func(*core.RequestEvent) error {
+func handleMCP(app core.App, rt *config.Runtime, idx *fulltext.Index, files mcpFileLinksConfig) func(*core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		// Always one account's view. A superuser token resolves to its paired
 		// users record rather than to every account: the admin is also an
@@ -124,7 +128,11 @@ func handleMCP(app core.App, rt *config.Runtime, idx *fulltext.Index) func(*core
 		if err != nil {
 			return writeError(e, http.StatusInternalServerError, "Failed to prepare the document tools.")
 		}
-		server := newMCPServer(tools, newMCPDocs(app, userID))
+		docs := newMCPDocs(app, userID)
+		if files.enabled {
+			docs = withMCPFileLinks(app, userID, docs)
+		}
+		server := newMCPServer(tools, docs)
 		addMCPWriteTools(server, app, userID, rt.Snapshot().Cfg.MCPCapabilities)
 		mcpHTTPHandler(server).ServeHTTP(e.Response, e.Request)
 		return nil
@@ -270,7 +278,8 @@ func addMCPDocsTools(server *mcp.Server, docs mcpDocs) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "get_document",
 		Description: "One document's metadata and its full extracted text, unranked and unabridged. " +
-			"Text is paged by offset and max_chars (at most 200000); text_chars is the whole length and truncated means more follows this page.",
+			"Text is paged by offset and max_chars (at most 200000); text_chars is the whole length and truncated means more follows this page. " +
+			"Set include_text=false for metadata only. When enabled by the operator, original_file and preview contain short-lived download URLs, not file bytes; call again to renew an expired link.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, args mcpGetArgs) (*mcp.CallToolResult, mcpGetResult, error) {
 		result, err := docs.get(ctx, args)
 		if err != nil {

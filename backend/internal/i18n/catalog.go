@@ -485,6 +485,10 @@ var catalog = map[string]map[string]string{
 		"de": "Auf einer von einem Hosting-Anbieter betriebenen Instanz nicht verfügbar.",
 		"ru": "Недоступно на экземпляре, которым управляет хостинг-провайдер.",
 	},
+	"Invalid application URL for MCP file links.": {
+		"de": "Ungültige Anwendungs-URL für MCP-Dateilinks.",
+		"ru": "Некорректный адрес приложения для MCP-ссылок на файлы.",
+	},
 	"Not found.": {
 		"de": "Nicht gefunden.",
 		"ru": "Не найдено.",

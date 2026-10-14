@@ -69,6 +69,16 @@ Two kinds: search over the index, and plain access to the rows. The intelligence
 | `count_documents` | Count documents matching filters, optionally grouped by `document_type`, `correspondent`, `year`, `month` or `tag`. |
 | `list_taxonomy` | The tag, document type and correspondent names in the archive, for the filters above. Each list stops at 5,000 names and says so with `truncated`. |
 
+## File links
+
+With `MCP_FILE_LINKS_ENABLED=1`, `get_document` also returns `original_file` and, when available, `preview`: the original upload and the PNG of its first page. Each has `url`, `filename`, `mime_type`, `size_bytes` and `expires_at`. No file bytes or base64 are placed in the tool response. Set `include_text: false` to omit OCR text; `text_chars` still reports its full length, and the default remains to return text.
+
+Set PocketBase's existing **Application URL** (`meta.appURL`) to the public base URL agents and users can reach, for example `https://lemmary.example.com`, including any deployment path prefix. Links use this setting, not the MCP request host or forwarded headers, so calls through an internal gateway still return public URLs. Changing the setting affects the next `get_document` call without restarting. There is no separate MCP public-URL environment variable.
+
+A link lasts three minutes and needs no authentication header: anyone holding it can download that one file. It cannot authenticate an account, download another document or switch between the original and preview. Download checks the caller's current access again; removing a share, deleting/replacing the file, or rotating the account token key invalidates it. Responses are not cacheable. Treat the URL as temporary sensitive data; do not log it or publish it. Call `get_document` again to renew an expired link.
+
+An agent can download a link straight to a local file and send it as an attachment without passing its bytes through the model. Viewing an image with a vision model is a separate action and does consume visual context. Preview links are omitted when no preview has been generated (including image uploads); use the original link for an image. File links are off by default, and disabling them removes their download route. There are no additional MCP tools or AI charges.
+
 ## Write tools
 
 Changing the archive is off by default. An admin switches each kind of change on under **Settings → MCP**, for every user's token at once; a switched-off tool is not offered at all. Every write applies only to documents and tags the token's user owns: a document shared with them stays read-only.
