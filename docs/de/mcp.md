@@ -69,6 +69,16 @@ Zwei Arten: Suche über den Index und einfacher Zugriff auf die Datensätze. Die
 | `count_documents` | Zählt Dokumente, die den Filtern entsprechen, optional gruppiert nach `document_type`, `correspondent`, `year`, `month` oder `tag`. |
 | `list_taxonomy` | Die Namen der Tags, Dokumenttypen und Korrespondenten im Archiv, für die oben genannten Filter. Jede Liste endet bei 5.000 Namen und meldet dies mit `truncated`. |
 
+## Dateilinks {#file-links}
+
+Mit `MCP_FILE_LINKS_ENABLED=1` liefert `get_document` zusätzlich `original_file` und, sofern vorhanden, `preview`: die Originaldatei und das PNG ihrer ersten Seite. Beide enthalten `url`, `filename`, `mime_type`, `size_bytes` und `expires_at`. Die Werkzeugantwort enthält weder Dateibytes noch Base64. Mit `include_text: false` wird der OCR-Text ausgelassen; `text_chars` zeigt weiterhin seine gesamte Länge. Standardmäßig wird der Text wie bisher zurückgegeben.
+
+Setze `MCP_PUBLIC_URL=https://lemmary.example.com` auf die öffentliche Basis-URL, die Agenten und Benutzer erreichen können, einschließlich eines möglichen Pfadpräfixes. Ohne diese Einstellung wird der Ursprung der MCP-Anfrage verwendet; hinter einem Gateway kann dies eine interne Adresse sein. Weiterleitungsheader werden zur Auswahl des Ursprungs nicht verwendet.
+
+Ein Link gilt drei Minuten und benötigt keinen Authentifizierungsheader: Jeder, der ihn besitzt, kann genau diese Datei herunterladen. Er authentifiziert kein Konto und erlaubt weder andere Dokumente noch den Wechsel zwischen Original und Vorschau. Beim Download wird die aktuelle Zugriffsberechtigung erneut geprüft. Das Entfernen einer Freigabe, das Löschen oder Ersetzen der Datei oder das Rotieren des Kontoschlüssels macht ihn ungültig. Antworten dürfen nicht zwischengespeichert werden. Behandle die URL als kurzzeitig vertrauliche Information; protokolliere und veröffentliche sie nicht. Ein erneuter Aufruf von `get_document` liefert einen neuen Link.
+
+Ein Agent kann den Link direkt in eine lokale Datei herunterladen und diese als Anhang senden, ohne die Bytes durch das Modell zu führen. Das Betrachten eines Bildes mit einem Vision-Modell ist ein eigener Schritt und verbraucht visuellen Kontext. Ohne erzeugte Vorschau (auch bei hochgeladenen Bildern) fehlt der Vorschaulink; für Bilder dient der Originallink. Dateilinks sind standardmäßig aus; das Abschalten entfernt auch ihre Downloadroute. Es gibt keine zusätzlichen MCP-Werkzeuge oder KI-Kosten.
+
 ## Schreibwerkzeuge {#write-tools}
 
 Änderungen am Archiv sind standardmäßig aus. Ein Admin schaltet jede Art von Änderung unter **Einstellungen → MCP** ein, für die Token aller Benutzer zugleich; ein ausgeschaltetes Werkzeug wird gar nicht angeboten. Jede Änderung betrifft nur Dokumente und Tags, die dem Benutzer des Tokens gehören: Ein mit ihm geteiltes Dokument bleibt schreibgeschützt.

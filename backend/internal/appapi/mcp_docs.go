@@ -66,9 +66,10 @@ type mcpListResult struct {
 }
 
 type mcpGetArgs struct {
-	ID       string `json:"id" jsonschema:"Document id."`
-	Offset   int    `json:"offset,omitempty" jsonschema:"Characters of text to skip, for paging through a long document."`
-	MaxChars int    `json:"max_chars,omitempty" jsonschema:"Most characters of text to return: default 100000, at most 200000."`
+	ID          string `json:"id" jsonschema:"Document id."`
+	Offset      int    `json:"offset,omitempty" jsonschema:"Characters of text to skip, for paging through a long document."`
+	MaxChars    int    `json:"max_chars,omitempty" jsonschema:"Most characters of text to return: default 100000, at most 200000."`
+	IncludeText *bool  `json:"include_text,omitempty" jsonschema:"Return extracted text (default true). Set false to fetch metadata and available file links without text."`
 }
 
 type mcpGetResult struct {
@@ -78,7 +79,9 @@ type mcpGetResult struct {
 	// complete read from a page of one.
 	TextChars int `json:"text_chars"`
 	// Truncated means text remains after this page.
-	Truncated bool `json:"truncated,omitempty"`
+	Truncated    bool         `json:"truncated,omitempty"`
+	OriginalFile *mcpFileLink `json:"original_file,omitempty"`
+	Preview      *mcpFileLink `json:"preview,omitempty"`
 }
 
 type mcpTaxonomyResult struct {
@@ -268,6 +271,9 @@ func getMCPDocument(app core.App, userID string, args mcpGetArgs) (mcpGetResult,
 	expandMCPDocuments(app, []*core.Record{record})
 	text := record.GetString("ocr_text")
 	out := mcpGetResult{mcpDocument: mcpDocumentOf(record), TextChars: utf8.RuneCountInString(text)}
+	if args.IncludeText != nil && !*args.IncludeText {
+		return out, nil
+	}
 	maxChars := args.MaxChars
 	if maxChars <= 0 {
 		maxChars = mcpDefaultTextChars
