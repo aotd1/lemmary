@@ -50,7 +50,8 @@ func TestMCPFileLinksReturnOriginalAndPreviewWithoutText(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv := mcpFilesServer(t, app)
-	docs := withMCPFileLinks(app, owner, newMCPDocs(app, owner), srv.URL)
+	app.Settings().Meta.AppURL = srv.URL
+	docs := withMCPFileLinks(app, owner, newMCPDocs(app, owner))
 	session := connectMCP(t, agentTools{}, docs)
 	var out mcpGetResult
 	res := callMCP(t, session, "get_document", map[string]any{"id": doc.Id, "include_text": false}, &out)
@@ -108,7 +109,8 @@ func TestMCPFileLinksRefuseOtherFilesTamperingAndExpiredTokens(t *testing.T) {
 	second := makeQueueDocument(t, app, owner, "completed", "")
 	foreign := makeQueueDocument(t, app, other, "completed", "")
 	srv := mcpFilesServer(t, app)
-	docs := withMCPFileLinks(app, owner, newMCPDocs(app, owner), srv.URL)
+	app.Settings().Meta.AppURL = srv.URL
+	docs := withMCPFileLinks(app, owner, newMCPDocs(app, owner))
 	out, err := docs.get(context.Background(), mcpGetArgs{ID: doc.Id})
 	if err != nil {
 		t.Fatal(err)
@@ -192,7 +194,8 @@ func TestMCPFileLinksRecheckSharingAndCurrentFilename(t *testing.T) {
 	if err := app.Save(share); err != nil {
 		t.Fatal(err)
 	}
-	docs := withMCPFileLinks(app, reader, newMCPDocs(app, reader), "https://archive.example")
+	app.Settings().Meta.AppURL = "https://archive.example"
+	docs := withMCPFileLinks(app, reader, newMCPDocs(app, reader))
 	out, err := docs.get(context.Background(), mcpGetArgs{ID: doc.Id})
 	if err != nil {
 		t.Fatal(err)
@@ -235,10 +238,9 @@ func TestMCPFileLinksRecheckSharingAndCurrentFilename(t *testing.T) {
 	}
 }
 
-func TestMCPFileLinksConfigurationAndOrigin(t *testing.T) {
+func TestMCPFileLinksConfigurationAndApplicationURL(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	t.Setenv("MCP_FILE_LINKS_ENABLED", "")
-	t.Setenv("MCP_PUBLIC_URL", "")
 	if mcpFileLinksFromEnv(log).enabled {
 		t.Fatal("default enabled")
 	}
@@ -246,29 +248,32 @@ func TestMCPFileLinksConfigurationAndOrigin(t *testing.T) {
 	if !mcpFileLinksFromEnv(log).enabled {
 		t.Fatal("enabled flag refused")
 	}
-	for _, value := range []string{"https://user:password@example.com", "ftp://example.com", "https://example.com?token=secret", "https://example.com#fragment", "https://example.com?", "https://example.com#", "/relative"} {
-		t.Setenv("MCP_PUBLIC_URL", value)
-		if mcpFileLinksFromEnv(log).enabled {
-			t.Fatalf("accepted invalid base URL %s", value)
-		}
-	}
-	t.Setenv("MCP_PUBLIC_URL", "https://archive.example/prefix/")
-	cfg := mcpFileLinksFromEnv(log)
-	if !cfg.enabled || cfg.baseURL != "https://archive.example/prefix" {
-		t.Fatalf("config=%#v", cfg)
-	}
-	e := &core.RequestEvent{}
-	e.Request = httptest.NewRequest(http.MethodPost, "http://internal.example/api/mcp", nil)
-	e.Request.Header.Set("X-Forwarded-Host", "attacker.example")
-	if got := mcpFileBaseURL(e, cfg.baseURL); got != cfg.baseURL {
-		t.Fatalf("configured origin=%s", got)
-	}
-	if got := mcpFileBaseURL(e, ""); got != "http://internal.example" {
-		t.Fatalf("fallback origin=%s", got)
-	}
 	t.Setenv("MCP_FILE_LINKS_ENABLED", "typo")
 	if mcpFileLinksFromEnv(log).enabled {
 		t.Fatal("invalid flag enabled")
+	}
+	app := bootQueueApp(t)
+	for _, value := range []string{"", "https://user:password@example.com", "ftp://example.com", "https://example.com?token=secret", "https://example.com#fragment", "https://example.com?", "https://example.com#", "/relative"} {
+		app.Settings().Meta.AppURL = value
+		if _, err := mcpFileBaseURL(app); err == nil {
+			t.Fatalf("accepted invalid application URL %s", value)
+		}
+	}
+	app.Settings().Meta.AppURL = " https://archive.example/prefix/ "
+	if got, err := mcpFileBaseURL(app); err != nil || got != "https://archive.example/prefix" {
+		t.Fatalf("application URL=%s %v", got, err)
+	}
+	owner := makeQueueUser(t, app, "application-url@example.com")
+	doc := makeQueueDocument(t, app, owner, "completed", "")
+	docs := withMCPFileLinks(app, owner, newMCPDocs(app, owner))
+	out, err := docs.get(context.Background(), mcpGetArgs{ID: doc.Id})
+	if err != nil || !strings.HasPrefix(out.OriginalFile.URL, "https://archive.example/prefix/api/") {
+		t.Fatalf("initial application URL: %#v %v", out, err)
+	}
+	app.Settings().Meta.AppURL = "https://updated.example"
+	out, err = docs.get(context.Background(), mcpGetArgs{ID: doc.Id})
+	if err != nil || !strings.HasPrefix(out.OriginalFile.URL, "https://updated.example/api/") {
+		t.Fatalf("updated application URL: %#v %v", out, err)
 	}
 }
 

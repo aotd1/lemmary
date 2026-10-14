@@ -73,7 +73,7 @@ Two kinds: search over the index, and plain access to the rows. The intelligence
 
 With `MCP_FILE_LINKS_ENABLED=1`, `get_document` also returns `original_file` and, when available, `preview`: the original upload and the PNG of its first page. Each has `url`, `filename`, `mime_type`, `size_bytes` and `expires_at`. No file bytes or base64 are placed in the tool response. Set `include_text: false` to omit OCR text; `text_chars` still reports its full length, and the default remains to return text.
 
-Set `MCP_PUBLIC_URL=https://lemmary.example.com` to the public base URL agents and users can reach, including any deployment path prefix. Without it, links use the MCP request's origin, which may be an internal address behind a gateway. Forwarded headers are not used to select the origin.
+Set PocketBase's existing **Application URL** (`meta.appURL`) to the public base URL agents and users can reach, for example `https://lemmary.example.com`, including any deployment path prefix. Links use this setting, not the MCP request host or forwarded headers, so calls through an internal gateway still return public URLs. Changing the setting affects the next `get_document` call without restarting. There is no separate MCP public-URL environment variable.
 
 A link lasts three minutes and needs no authentication header: anyone holding it can download that one file. It cannot authenticate an account, download another document or switch between the original and preview. Download checks the caller's current access again; removing a share, deleting/replacing the file, or rotating the account token key invalidates it. Responses are not cacheable. Treat the URL as temporary sensitive data; do not log it or publish it. Call `get_document` again to renew an expired link.
 

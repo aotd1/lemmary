@@ -14,6 +14,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/filesystem"
 	"github.com/pocketbase/pocketbase/tools/security"
+	"lemmary/backend/internal/i18n"
 )
 
 const (
@@ -32,7 +33,6 @@ type mcpFileLink struct {
 
 type mcpFileLinksConfig struct {
 	enabled bool
-	baseURL string
 }
 
 func mcpFileLinksFromEnv(log *slog.Logger) mcpFileLinksConfig {
@@ -46,34 +46,28 @@ func mcpFileLinksFromEnv(log *slog.Logger) mcpFileLinksConfig {
 		log.Error("MCP file links disabled: MCP_FILE_LINKS_ENABLED must be a boolean")
 		return cfg
 	}
-	cfg.baseURL = strings.TrimRight(strings.TrimSpace(os.Getenv("MCP_PUBLIC_URL")), "/")
-	if cfg.baseURL != "" {
-		u, err := url.Parse(cfg.baseURL)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || strings.Contains(cfg.baseURL, "#") {
-			log.Error("MCP file links disabled: MCP_PUBLIC_URL must be an HTTP(S) base URL without credentials, query or fragment")
-			return mcpFileLinksConfig{}
-		}
-	}
 	return cfg
 }
 
-func mcpFileBaseURL(e *core.RequestEvent, configured string) string {
-	if configured != "" {
-		return configured
+func mcpFileBaseURL(app core.App) (string, error) {
+	baseURL := strings.TrimRight(strings.TrimSpace(app.Settings().Meta.AppURL), "/")
+	u, err := url.Parse(baseURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || strings.Contains(baseURL, "#") {
+		return "", i18n.Errorf("Invalid application URL for MCP file links.")
 	}
-	scheme := "http"
-	if e.IsTLS() {
-		scheme = "https"
-	}
-	return scheme + "://" + e.Request.Host
+	return baseURL, nil
 }
 
-func withMCPFileLinks(app core.App, userID string, docs mcpDocs, baseURL string) mcpDocs {
+func withMCPFileLinks(app core.App, userID string, docs mcpDocs) mcpDocs {
 	get := docs.get
 	docs.get = func(ctx context.Context, args mcpGetArgs) (mcpGetResult, error) {
 		out, err := get(ctx, args)
 		if err != nil {
 			return out, err
+		}
+		baseURL, err := mcpFileBaseURL(app)
+		if err != nil {
+			return mcpGetResult{}, err
 		}
 		record, err := app.FindRecordById("documents", out.ID)
 		if err != nil || !CanReadDocument(app, record, userID) {

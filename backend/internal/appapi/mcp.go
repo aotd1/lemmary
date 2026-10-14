@@ -130,7 +130,7 @@ func handleMCP(app core.App, rt *config.Runtime, idx *fulltext.Index, files mcpF
 		}
 		docs := newMCPDocs(app, userID)
 		if files.enabled {
-			docs = withMCPFileLinks(app, userID, docs, mcpFileBaseURL(e, files.baseURL))
+			docs = withMCPFileLinks(app, userID, docs)
 		}
 		server := newMCPServer(tools, docs)
 		addMCPWriteTools(server, app, userID, rt.Snapshot().Cfg.MCPCapabilities)
